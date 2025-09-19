@@ -8,7 +8,7 @@ env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: docker-registry.senator.tools
   # github.repository as <account>/<repo>
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: library/${{ github.event.repository.name }}
 
 
 jobs:
