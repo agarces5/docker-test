@@ -15,6 +15,9 @@ async fn hello(Query(params): Query<HashMap<String, String>>) -> String {
 }
 #[tokio::main]
 async fn main() {
+    // initialize env vars
+    dotenvy::dotenv().ok();
+
     // initialize tracing
     tracing_subscriber::fmt()
         .with_target(false)
@@ -26,9 +29,6 @@ async fn main() {
         )
         .compact()
         .init();
-
-    // initialize env vars
-    dotenvy::dotenv().ok();
 
     //build app
     let app = Router::new().route("/", get(hello)).layer((
