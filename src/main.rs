@@ -5,7 +5,6 @@ use axum::extract::Query;
 use axum::routing::get;
 
 async fn hello(Query(params): Query<HashMap<String, String>>) -> String {
-    tracing::debug!("{params:?}");
     let name = params
         .get("name")
         .unwrap_or(&"World".to_string())
@@ -21,7 +20,10 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     //build app
-    let app = Router::new().route("/", get(hello));
+    let app = Router::new().route("/", get(hello)).layer((
+        tower_http::trace::TraceLayer::new_for_http(),
+        tower_http::timeout::TimeoutLayer::new(std::time::Duration::from_secs(5)),
+    ));
 
     let host = std::env::var("HOST").unwrap_or("127.0.0.1".to_string());
     let port = std::env::var("PORT").unwrap_or("3000".to_string());
@@ -29,5 +31,34 @@ async fn main() {
         .await
         .unwrap();
     tracing::debug!("Listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
+}
+
+async fn shutdown_signal() {
+    use tokio::signal;
+
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
